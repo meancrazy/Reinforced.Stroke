@@ -1,9 +1,9 @@
-# Reinforced.Stroke
-Simple EntityFramework 6.1 enchancement for strongly typed raw SQL queries
+# Reinforced.Stroke.Core
+Simple EntityFramework.Core enchancement for strongly typed raw SQL queries
 
 # Usage
 
-Clone, build, then reference ```Reinforced.Stroke.dll```. After that, all your EF6 DbContexts will have method ```Stroke```. Use it as follows:
+Clone, build, then reference ```Reinforced.Stroke.Core.dll```. After that, all your EFCore DbContexts will have method ```Stroke```. Use it as follows:
 
 ```csharp
 context.Stroke<Order>(x => $"DELETE FROM {x} WHERE {x.Subtotal} = 0");
@@ -50,4 +50,4 @@ INNER JOIN [Orders] [o] ON [i].[OrderId] = [o].[Id]
 WHERE [o].[Total] = 0
 ```
 
-(columns and tables changed according to EF mappings)
+(columns and tables changed according to EFCore mappings)
