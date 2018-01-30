@@ -1,8 +1,8 @@
 ﻿using System;
-using System.Data.Entity;
 using System.Linq.Expressions;
+using Microsoft.EntityFrameworkCore;
 
-namespace Reinforced.Stroke
+namespace Reinforced.Stroke.Core
 {
     /// <summary>
     /// Extensions for SQL Stroke (type-safe raw SQL execution)
@@ -99,8 +99,7 @@ namespace Reinforced.Stroke
 
         private static void InnerStroke(DbContext context, LambdaExpression expr, bool fullQualified)
         {
-            object[] pars = null;
-            var sql = InterpolationParseringExtensions.RevealQuery(context, expr, fullQualified, out pars);
+            var sql = InterpolationParseringExtensions.RevealQuery(context, expr, fullQualified, out var pars);
             context.Database.ExecuteSqlCommand(sql, pars);
         }
     }

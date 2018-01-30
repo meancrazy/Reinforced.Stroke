@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace Reinforced.Stroke
+namespace Reinforced.Stroke.Core
 {
     /// <summary>
     /// Cache entry that contains Type-Table mapping and particular fields mappings

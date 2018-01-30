@@ -1,44 +1,42 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data.Entity;
 using System.Linq.Expressions;
+using Microsoft.EntityFrameworkCore;
 
-namespace Reinforced.Stroke
+namespace Reinforced.Stroke.Core
 {
     internal class InterpolationParseringExtensions
     {
         public static string RevealQuery(DbContext context, LambdaExpression expr, bool fullQualified, out object[] parameters)
         {
-            const string err = "SQL Storke must be in form of context.Stroke(x=>$\"SOME SQL WITH {x} AND {x.Field} USAGE\")";
-            var bdy = expr.Body as MethodCallExpression;
-            if (bdy == null) throw new Exception(err);
-            if (bdy.Method.DeclaringType != typeof(String) && bdy.Method.Name != "Format")
+            const string err = "SQL Stroke must be in form of context.Stroke(x=>$\"SOME SQL WITH {x} AND {x.Field} USAGE\")";
+            if (!(expr.Body is MethodCallExpression bdy)) throw new Exception(err);
+            if (bdy.Method.DeclaringType != typeof(string) || bdy.Method.Name != "Format")
             {
                 throw new Exception(err);
             }
 
-            var fmtExpr = bdy.Arguments[0] as ConstantExpression;
-            if (fmtExpr == null) throw new Exception(err);
+            if (!(bdy.Arguments[0] is ConstantExpression fmtExpr)) throw new Exception(err);
             var format = fmtExpr.Value.ToString();
 
-            int startingIndex = 1;
+            var startingIndex = 1;
             var arguments = bdy.Arguments;
-            bool longFormat = false;
+            var longFormat = false;
             if (bdy.Arguments.Count == 2)
             {
                 var secondArg = bdy.Arguments[1];
                 if (secondArg.NodeType == ExpressionType.NewArrayInit)
                 {
-                    var array = secondArg as NewArrayExpression;
+                    var array = (NewArrayExpression) secondArg;
                     arguments = array.Expressions;
                     startingIndex = 0;
                     longFormat = true;
                 }
             }
 
-            List<string> formatArgs = new List<string>();
-            List<object> sqlParams = new List<object>();
-            for (int i = startingIndex; i < arguments.Count; i++)
+            var formatArgs = new List<object>();
+            var sqlParams = new List<object>();
+            for (var i = startingIndex; i < arguments.Count; i++)
             {
                 var cArg = Unconvert(arguments[i]);
                 if (!IsScopedParameterAccess(cArg))
@@ -46,7 +44,7 @@ namespace Reinforced.Stroke
                     var lex = Expression.Lambda(cArg);
                     var compiled = lex.Compile();
                     var result = compiled.DynamicInvoke();
-                    formatArgs.Add(string.Format("{{{0}}}", sqlParams.Count));
+                    formatArgs.Add($"{{{sqlParams.Count}}}");
                     sqlParams.Add(result);
                     continue;
                 }
@@ -54,36 +52,36 @@ namespace Reinforced.Stroke
                 {
                     if (fullQualified)
                     {
-                        var par = cArg as ParameterExpression;
+                        var par = (ParameterExpression) cArg;
                         var argIdx = longFormat ? i : i - 1;
                         if (NeedsDec(format, argIdx))
                         {
-                            formatArgs.Add(string.Format("[{0}] [{1}]", context.GetTableName(cArg.Type), par.Name));
+                            formatArgs.Add($"[{context.GetTableName(cArg.Type)}] [{par.Name}]");
                         }
                         else
                         {
                             formatArgs.Add(par.Name);
                         }
                     }
-                    else formatArgs.Add(string.Format("[{0}]", context.GetTableName(cArg.Type)));
+                    else formatArgs.Add($"[{context.GetTableName(cArg.Type)}]");
 
                     continue;
                 }
-                var argProp = cArg as MemberExpression;
+
+                var argProp = (MemberExpression) cArg;
 
                 if (argProp.Expression.NodeType != ExpressionType.Parameter)
                 {
                     var root = GetRootMember(argProp);
-                    throw new Exception(string.Format("Please refer only top-level properties of {0}", root.Type));
+                    throw new Exception($"Please refer only top-level properties of {root.Type}");
                 }
 
-
-                var colId = string.Format("[{0}]", context.GetColumnName(argProp.Member.DeclaringType, argProp.Member.Name));
+                var colId = $"[{context.GetColumnName(argProp.Member.DeclaringType, argProp.Member.Name)}]";
                 if (fullQualified)
                 {
                     var root = GetRootMember(argProp);
                     var parRef = root as ParameterExpression;
-                    colId = string.Format("[{0}].{1}", parRef, colId);
+                    colId = $"[{parRef}].{colId}";
                 }
                 formatArgs.Add(colId);
             }
@@ -94,22 +92,25 @@ namespace Reinforced.Stroke
 
         private static bool NeedsDec(string format, int argNumber)
         {
-            var searchString = "{" + argNumber + "}";
+            var searchString = $"{{{argNumber}}}";
             var idx = format.IndexOf(searchString, StringComparison.InvariantCultureIgnoreCase) - 1;
-            if (idx <= 0) return false;
+            if (idx <= 0)
+                return false;
+
             while (char.IsWhiteSpace(format, idx)) idx--;
-            if (idx - 4 < 0) return false;
+            if (idx - 4 < 0)
+                return false;
+
             var s = format.Substring(idx - 3, 4);
             return string.Compare(s, "FROM", StringComparison.InvariantCultureIgnoreCase) == 0 ||
                    string.Compare(s, "JOIN", StringComparison.InvariantCultureIgnoreCase) == 0;
         }
 
-
         private static Expression Unconvert(Expression ex)
         {
             if (ex.NodeType == ExpressionType.Convert)
             {
-                var cex = ex as UnaryExpression;
+                var cex = (UnaryExpression) ex;
                 ex = cex.Operand;
             }
             return ex;
@@ -129,14 +130,14 @@ namespace Reinforced.Stroke
 
         private static bool IsScopedParameterAccess(Expression expr)
         {
-            if (expr.NodeType == ExpressionType.Parameter) return true;
-            var ex = expr as MemberExpression;
-            if (ex == null) return false;
+            if (expr.NodeType == ExpressionType.Parameter)
+                return true;
+
+            if (!(expr is MemberExpression ex))
+                return false;
 
             var root = GetRootMember(ex);
-            if (root == null) return false;
-            if (root.NodeType != ExpressionType.Parameter) return false;
-            return true;
+            return root?.NodeType == ExpressionType.Parameter;
         }
     }
 }
